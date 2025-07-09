@@ -40,7 +40,7 @@ COLORES_TIPOS = {
 
 COLORES_GRUPOS = px.colors.qualitative.Set3
 
-@st.cache_resource
+@st.cache_data(ttl=24*60*60)  # <-- aquí: cache con time-to-live de 86400 segundos
 def cargar_layout_robusto(base_dir):
     """Carga el layout BIDS manejando archivos JSON corruptos"""
     corrupted_files = []
@@ -66,10 +66,12 @@ def cargar_layout_robusto(base_dir):
                 except Exception as e:
                     st.error(f"❌ No se pudo renombrar {f}: {e}")
     
+    # Al usar ttl=86400, Streamlit invalidará este cache cada 24 horas automáticamente
     return BIDSLayout(base_dir, validate=False)
 
-# Cargar layout
+# Carga inicial (o recarga si pasó más de un día)
 layout = cargar_layout_robusto(BASE_DIR)
+
 
 # Sidebar con información y filtros
 with st.sidebar:
