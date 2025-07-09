@@ -326,9 +326,9 @@ with col2:
         hovertemplate='<b>Grupo: %{y}</b><br>Tipo: %{x}<br>Archivos: %{z}<extra></extra>',
         colorbar=dict(
             title="Número de Archivos",
-            titleside="right",
             tickmode="linear",
-            thickness=20
+            thickness=20,
+            len=0.7
         ),
         text=pivot_table.values,
         texttemplate="%{text}",
