@@ -71,7 +71,7 @@ def cargar_layout_robusto(base_dir):
 # Cargar layout
 layout = cargar_layout_robusto(BASE_DIR)
 
-# Sidebar con información
+# Sidebar con información y filtros
 with st.sidebar:
     st.markdown("### 📊 Información del Dataset")
     st.markdown(f"**📁 Directorio base:** {BASE_DIR}")
@@ -91,6 +91,34 @@ with st.sidebar:
                 st.code(os.path.basename(f), language="text")
     else:
         st.success("✅ No hay archivos JSON inválidos")
+    
+    st.markdown("---")
+    
+    # NUEVO: Filtro para archivos "otros"
+    st.markdown("### 🔧 Filtros de Calidad de Datos")
+    
+    # Checkbox para incluir/excluir archivos "otros"
+    incluir_otros = st.checkbox(
+        "🗂️ Incluir archivos 'otros'", 
+        value=True,
+        help="Los archivos 'otros' pueden sesgar los resultados. Desactiva para un análisis más preciso."
+    )
+    
+    # Slider para filtrar tipos con pocos archivos
+    min_archivos_tipo = st.slider(
+        "📊 Mínimo de archivos por tipo",
+        min_value=1,
+        max_value=20,
+        value=1,
+        help="Excluye tipos de imagen con menos archivos del análisis"
+    )
+    
+    # Información sobre el filtrado
+    if not incluir_otros:
+        st.info("🎯 Archivos 'otros' excluidos del análisis")
+    
+    if min_archivos_tipo > 1:
+        st.info(f"🔍 Solo tipos con ≥{min_archivos_tipo} archivos")
 
 # Clasificar archivos
 archivo_tipo = []
@@ -128,6 +156,26 @@ if layout:
         st.error(f"❌ Error leyendo archivos: {e}")
 
 df_archivos = pd.DataFrame(archivo_tipo)
+
+# NUEVO: Aplicar filtros de calidad de datos
+df_original = df_archivos.copy()
+
+# Filtrar archivos "otros" si está desactivado
+if not incluir_otros:
+    df_archivos = df_archivos[df_archivos["tipo"] != "otro"]
+
+# Filtrar tipos con pocos archivos
+if min_archivos_tipo > 1:
+    conteos_tipo = df_archivos["tipo"].value_counts()
+    tipos_validos = conteos_tipo[conteos_tipo >= min_archivos_tipo].index
+    df_archivos = df_archivos[df_archivos["tipo"].isin(tipos_validos)]
+
+# Mostrar información sobre el filtrado
+col1, col2 = st.columns(2)
+with col1:
+    st.info(f"📊 **Archivos originales:** {len(df_original)}")
+with col2:
+    st.info(f"📊 **Archivos después de filtros:** {len(df_archivos)}")
 
 # Métricas principales
 if not df_archivos.empty:
@@ -214,7 +262,7 @@ fig_tipos.update_layout(
 st.plotly_chart(fig_tipos, use_container_width=True)
 
 # Gráficos complementarios
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1, 2])  # Hacer la columna del heatmap más grande
 
 with col1:
     # Gráfico de dona para el grupo seleccionado
@@ -236,7 +284,7 @@ with col1:
         
         fig_dona.update_layout(
             title=f"Composición de Tipos - Grupo {grupo_seleccionado}",
-            height=400,
+            height=500,
             template="plotly_white",
             showlegend=True,
             legend=dict(
@@ -251,8 +299,8 @@ with col1:
         st.plotly_chart(fig_dona, use_container_width=True)
 
 with col2:
-    # Heatmap de grupos vs tipos con colores amarillo a rojo oscuro
-    st.markdown("#### 🌡️ Mapa de Calor")
+    # MEJORADO: Heatmap más grande con mejor paleta de colores
+    st.markdown("#### 🌡️ Mapa de Calor - Grupos vs Tipos")
     
     pivot_table = df_archivos.pivot_table(
         values="archivo", 
@@ -262,24 +310,46 @@ with col2:
         fill_value=0
     )
     
+    # Nueva paleta de colores: de azul claro a azul oscuro (mejor legibilidad)
     fig_heatmap = go.Figure(data=go.Heatmap(
         z=pivot_table.values,
         x=pivot_table.columns,
         y=pivot_table.index,
-        colorscale=[[0, '#FFFF00'], [0.5, '#FF8C00'], [1, '#8B0000']],  # Amarillo a rojo oscuro
+        colorscale=[
+            [0, '#f0f9ff'],      # Azul muy claro
+            [0.2, '#bae6fd'],    # Azul claro
+            [0.4, '#7dd3fc'],    # Azul medio-claro
+            [0.6, '#38bdf8'],    # Azul medio
+            [0.8, '#0284c7'],    # Azul oscuro
+            [1, '#0c4a6e']       # Azul muy oscuro
+        ],
         hovertemplate='<b>Grupo: %{y}</b><br>Tipo: %{x}<br>Archivos: %{z}<extra></extra>',
-        colorbar=dict(title="Número de Archivos"),
+        colorbar=dict(
+            title="Número de Archivos",
+            titleside="right",
+            tickmode="linear",
+            thickness=20
+        ),
         text=pivot_table.values,
         texttemplate="%{text}",
-        textfont={"size": 12, "color": "white"}
+        textfont={"size": 14, "color": "white", "family": "Arial Black"},
+        showscale=True
     ))
     
     fig_heatmap.update_layout(
-        title="Grupos vs Tipos de Imagen",
+        title="Matriz de Distribución: Grupos vs Tipos de Imagen",
         xaxis_title="Tipo de Imagen",
         yaxis_title="Grupo",
-        height=400,
-        template="plotly_white"
+        height=500,  # Aumentado de 400 a 500
+        template="plotly_white",
+        font=dict(size=12),
+        xaxis=dict(
+            tickangle=45,
+            tickfont=dict(size=11)
+        ),
+        yaxis=dict(
+            tickfont=dict(size=11)
+        )
     )
     
     st.plotly_chart(fig_heatmap, use_container_width=True)
@@ -394,6 +464,36 @@ if not df_filtrado.empty:
         
         st.plotly_chart(fig_grupos_filt, use_container_width=True)
 
+# NUEVO: Sección de estadísticas de filtrado
+if not incluir_otros or min_archivos_tipo > 1:
+    st.markdown("### 📊 Estadísticas de Filtrado")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        archivos_excluidos = len(df_original) - len(df_archivos)
+        st.metric(
+            "📉 Archivos Excluidos", 
+            archivos_excluidos,
+            delta=f"{archivos_excluidos/len(df_original)*100:.1f}% del total"
+        )
+    
+    with col2:
+        if not incluir_otros:
+            otros_excluidos = len(df_original[df_original["tipo"] == "otro"])
+            st.metric(
+                "🗂️ Archivos 'Otros' Excluidos", 
+                otros_excluidos
+            )
+    
+    with col3:
+        if min_archivos_tipo > 1:
+            tipos_excluidos = len(df_original["tipo"].unique()) - len(df_archivos["tipo"].unique())
+            st.metric(
+                "🔬 Tipos Excluidos", 
+                tipos_excluidos
+            )
+
 # Opción para ver archivos listados
 if st.checkbox("📄 Ver lista detallada de archivos"):
     st.markdown("### 📂 Lista de Archivos")
@@ -404,6 +504,6 @@ if st.checkbox("📄 Ver lista detallada de archivos"):
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 20px;">
-    <p>🧠 Explorador BIDS | Desarrollado por Pablo Reyes</p>
+    <p>🧠 Explorador BIDS | Desarrollado por Pablo Reyes | Versión Mejorada</p>
 </div>
 """, unsafe_allow_html=True)
