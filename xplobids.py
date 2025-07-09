@@ -261,98 +261,101 @@ fig_tipos.update_layout(
 
 st.plotly_chart(fig_tipos, use_container_width=True)
 
-# Gráficos complementarios
-col1, col2 = st.columns([1, 2])  # Hacer la columna del heatmap más grande
+# Gráfico de dona para el grupo seleccionado
+st.markdown("### 📊 Composición de Tipos por Grupo")
 
-with col1:
-    # Gráfico de dona para el grupo seleccionado
-    if conteo_tipo.sum() > 0:
-        conteo_positivo = conteo_tipo[conteo_tipo > 0]
-        colores_positivos = [COLORES_TIPOS.get(tipo, "#95A5A6") for tipo in conteo_positivo.index]
-        
-        fig_dona = go.Figure(data=[
-            go.Pie(
-                labels=conteo_positivo.index,
-                values=conteo_positivo.values,
-                hole=0.4,
-                marker_colors=colores_positivos,
-                hovertemplate='<b>%{label}</b><br>Archivos: %{value}<br>Porcentaje: %{percent}<extra></extra>',
-                textinfo='label+percent',
-                textposition='auto'
-            )
-        ])
-        
-        fig_dona.update_layout(
-            title=f"Composición de Tipos - Grupo {grupo_seleccionado}",
-            height=500,
-            template="plotly_white",
-            showlegend=True,
-            legend=dict(
-                orientation="v",
-                yanchor="middle",
-                y=0.5,
-                xanchor="left",
-                x=1.05
-            )
+if conteo_tipo.sum() > 0:
+    conteo_positivo = conteo_tipo[conteo_tipo > 0]
+    colores_positivos = [COLORES_TIPOS.get(tipo, "#95A5A6") for tipo in conteo_positivo.index]
+    
+    fig_dona = go.Figure(data=[
+        go.Pie(
+            labels=conteo_positivo.index,
+            values=conteo_positivo.values,
+            hole=0.4,
+            marker_colors=colores_positivos,
+            hovertemplate='<b>%{label}</b><br>Archivos: %{value}<br>Porcentaje: %{percent}<extra></extra>',
+            textinfo='label+percent',
+            textposition='auto'
         )
-        
-        st.plotly_chart(fig_dona, use_container_width=True)
-
-with col2:
-    # MEJORADO: Heatmap más grande con mejor paleta de colores
-    st.markdown("#### 🌡️ Mapa de Calor - Grupos vs Tipos")
+    ])
     
-    pivot_table = df_archivos.pivot_table(
-        values="archivo", 
-        index="grupo", 
-        columns="tipo", 
-        aggfunc="count", 
-        fill_value=0
-    )
-    
-    # Nueva paleta de colores: de azul claro a azul oscuro (mejor legibilidad)
-    fig_heatmap = go.Figure(data=go.Heatmap(
-        z=pivot_table.values,
-        x=pivot_table.columns,
-        y=pivot_table.index,
-        colorscale=[
-            [0, '#f0f9ff'],      # Azul muy claro
-            [0.2, '#bae6fd'],    # Azul claro
-            [0.4, '#7dd3fc'],    # Azul medio-claro
-            [0.6, '#38bdf8'],    # Azul medio
-            [0.8, '#0284c7'],    # Azul oscuro
-            [1, '#0c4a6e']       # Azul muy oscuro
-        ],
-        hovertemplate='<b>Grupo: %{y}</b><br>Tipo: %{x}<br>Archivos: %{z}<extra></extra>',
-        colorbar=dict(
-            title="Número de Archivos",
-            tickmode="linear",
-            thickness=20,
-            len=0.7
-        ),
-        text=pivot_table.values,
-        texttemplate="%{text}",
-        textfont={"size": 14, "color": "white", "family": "Arial Black"},
-        showscale=True
-    ))
-    
-    fig_heatmap.update_layout(
-        title="Matriz de Distribución: Grupos vs Tipos de Imagen",
-        xaxis_title="Tipo de Imagen",
-        yaxis_title="Grupo",
-        height=500,  # Aumentado de 400 a 500
+    fig_dona.update_layout(
+        title=f"Composición de Tipos - Grupo {grupo_seleccionado}",
+        height=400,
         template="plotly_white",
-        font=dict(size=12),
-        xaxis=dict(
-            tickangle=45,
-            tickfont=dict(size=11)
-        ),
-        yaxis=dict(
-            tickfont=dict(size=11)
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.2,
+            xanchor="center",
+            x=0.5
         )
     )
     
-    st.plotly_chart(fig_heatmap, use_container_width=True)
+    st.plotly_chart(fig_dona, use_container_width=True)
+
+# MEJORADO: Heatmap a ancho completo
+st.markdown("### 🌡️ Mapa de Calor - Grupos vs Tipos de Imagen")
+
+pivot_table = df_archivos.pivot_table(
+    values="archivo", 
+    index="grupo", 
+    columns="tipo", 
+    aggfunc="count", 
+    fill_value=0
+)
+
+# Calcular el rango de valores para configurar los ticks de la colorbar
+max_valor = pivot_table.values.max()
+tick_interval = max(1, (max_valor // 10) * 2)  # Aproximadamente cada 50 o ajuste automático
+
+# Nueva paleta de colores: de azul claro a azul oscuro (mejor legibilidad)
+fig_heatmap = go.Figure(data=go.Heatmap(
+    z=pivot_table.values,
+    x=pivot_table.columns,
+    y=pivot_table.index,
+    colorscale=[
+        [0, '#f0f9ff'],      # Azul muy claro
+        [0.2, '#bae6fd'],    # Azul claro
+        [0.4, '#7dd3fc'],    # Azul medio-claro
+        [0.6, '#38bdf8'],    # Azul medio
+        [0.8, '#0284c7'],    # Azul oscuro
+        [1, '#0c4a6e']       # Azul muy oscuro
+    ],
+    hovertemplate='<b>Grupo: %{y}</b><br>Tipo: %{x}<br>Archivos: %{z}<extra></extra>',
+    colorbar=dict(
+        title="Número de Archivos",
+        tickmode="linear",
+        tick0=0,
+        dtick=max(50, tick_interval),
+        thickness=20,
+        len=0.6
+    ),
+    text=pivot_table.values,
+    texttemplate="%{text}",
+    textfont={"size": 14, "color": "white", "family": "Arial"},
+    showscale=True
+))
+
+fig_heatmap.update_layout(
+    title="Matriz de Distribución: Grupos vs Tipos de Imagen",
+    xaxis_title="Tipo de Imagen",
+    yaxis_title="Grupo",
+    height=500,
+    template="plotly_white",
+    font=dict(size=12),
+    xaxis=dict(
+        tickangle=45,
+        tickfont=dict(size=11)
+    ),
+    yaxis=dict(
+        tickfont=dict(size=11)
+    )
+)
+
+st.plotly_chart(fig_heatmap, use_container_width=True)
 
 # Filtros interactivos
 st.markdown("### 🔍 Filtros Interactivos")
